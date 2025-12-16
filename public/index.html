@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>PC통신 WebOS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+html,body{
+  margin:0;
+  height:100%;
+  background:black;
+  color:#00ff00;
+  font-family:"Courier New", monospace;
+}
+#status{
+  padding:4px;
+  border-bottom:1px solid #00ff00;
+}
+#screen{
+  height:80vh;
+  padding:10px;
+  overflow-y:auto;
+  white-space:pre-wrap;
+}
+input{
+  width:100%;
+  background:black;
+  color:#00ff00;
+  border:none;
+  outline:none;
+  font-size:16px;
+}
+.crt{
+  animation:flicker 0.15s infinite;
+}
+@keyframes flicker{
+  0%{opacity:0.96}
+  50%{opacity:1}
+  100%{opacity:0.98}
+}
+</style>
+</head>
+<body class="crt">
+
+<div id="status">Tel | KS-5601 | 9600bps | 접속중</div>
+<div id="screen"></div>
+<input id="input" placeholder="부팅중..." autocomplete="off">
+
+<audio id="beep">
+  <source src="https://freesound.org/data/previews/66/66717_931655-lq.mp3">
+</audio>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const screen = document.getElementById("screen");
+const input = document.getElementById("input");
+const beep = document.getElementById("beep");
+const socket = io();
+
+let stage = 0;
+
+function print(t){
+  screen.innerHTML += t + "\n";
+  screen.scrollTop = screen.scrollHeight;
+}
+
+/* 부팅 화면 */
+const boot = [
+  "Starting PC-TEL OS 1997...",
+  "Memory Test : 65536 OK",
+  "Loading KS-5601 Hangul...",
+  "Initializing Modem 9600bps...",
+  "Ready."
+];
+
+let i = 0;
+const bootTimer = setInterval(()=>{
+  print(boot[i]);
+  i++;
+  if(i >= boot.length){
+    clearInterval(bootTimer);
+    print("");
+    print("닉네임을 입력하세요.");
+    input.placeholder = "닉네임 입력 후 Enter";
+    stage = 1;
+  }
+}, 700);
+
+/* 입력 처리 */
+input.addEventListener("keydown", e=>{
+  if(e.key === "Enter"){
+    beep.play().catch(()=>{});
+
+    if(stage === 1){
+      const nick = input.value.trim();
+      if(!nick) return;
+      socket.emit("join", nick);
+
+      print("");
+      print("채널 목록:");
+      print("서울 경기 인천 강원 충북 충남 대전 세종");
+      print("전북 전남 광주 경북 경남 대구 부산 울산 제주 자유");
+      print("명령어: /join 지역  |  /who  |  /time");
+
+      input.placeholder = "메시지 입력";
+      input.value = "";
+      stage = 2;
+    }
+    else if(stage === 2){
+      const msg = input.value.trim();
+      if(!msg) return;
+      socket.emit("chat", msg);
+      input.value = "";
+    }
+  }
+});
+
+socket.on("system", msg => print(msg));
+socket.on("chat", msg => print(msg));
+</script>
+
+</body>
+</html>
